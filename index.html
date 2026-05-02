@@ -1235,7 +1235,7 @@ function renderEnrichedDetail(s) {
     <button class="dact-btn" onclick="promptAction('outreach','${escJ(s.name)}','${escJ(s.address||'')}','${escJ(o.principalName||o.entityName||'the owner')}')"><span class="dact-icon">✉</span>Draft owner outreach letter</button>
     <button class="dact-btn" onclick="openPA(${s._id})" style="border-color:var(--blue);color:var(--blue)"><span class="dact-icon">🔗</span>Open ${escJ(s.county||'')} County Property Appraiser</button>
     ${(s.lat&&s.lng)?'<button class="dact-btn" onclick="openPA_coords('+s.lat+','+s.lng+')" style="border-color:var(--ink-3);color:var(--ink-2)"><span class="dact-icon">📍</span>View parcel on Regrid map</button>':''}
-  \`;
+  `;;
 
   const enrichEl = document.getElementById('enrichSection');
   if (enrichEl) enrichEl.outerHTML = enrichHtml;
@@ -1249,10 +1249,10 @@ function closeDrawer(){
 
 function promptAction(type, name, addr, extra) {
   const prompts = {
-    concepts: `I'm evaluating "${name}" at ${addr} for retail/restaurant development. The best-fit uses are: ${extra}. What concepts would work best here, and what should I prioritize in due diligence?`,
-    outreach: `Help me draft a professional outreach letter to ${extra} about acquiring or ground-leasing the commercial parcel at ${addr} (${name}). Keep it concise, professional, and make a compelling case for why a transaction makes sense for them.`,
-    comps: `Find comparable commercial land sales near ${addr} (${extra}, FL) in the past 24 months. What's the typical price per acre for commercial land of this size in this market?`,
-    zoning: `What are the permitting and zoning considerations for ${extra} in Florida for a QSR or restaurant pad development? What approvals would typically be required and what's a realistic timeline?`
+    concepts: "I am evaluating \"" + name + "\" at " + addr + " for retail/restaurant development. The best-fit uses are: " + extra + ". What concepts would work best here, and what should I prioritize in due diligence?",
+    outreach: "Help me draft a professional outreach letter to " + extra + " about acquiring or ground-leasing the commercial parcel at " + addr + " (" + name + "). Keep it concise, professional, and make a compelling case for why a transaction makes sense for them.",
+    comps: "Find comparable commercial land sales near " + addr + " (" + extra + ", FL) in the past 24 months. What is the typical price per acre for commercial land of this size in this market?",
+    zoning: "What are the permitting and zoning considerations for " + extra + " in Florida for a QSR or restaurant pad development? What approvals would typically be required and what is a realistic timeline?"
   };
   navigator.clipboard?.writeText(prompts[type]).then(()=>showToast('Prompt copied to clipboard')).catch(()=>{});
   alert('Copied to clipboard:\n\n'+prompts[type]);
@@ -1272,41 +1272,41 @@ function openPA(id) {
   if (lat && lng) {
     // Open Alachua county GIS or county-specific viewer if known, else FL statewide
     const countyGIS = {
-      alachua: `https://www.acpafl.org/search?locate=${encodeURIComponent(s.address||'')}`,
-      broward: `https://bcpa.net/RecMenu.asp`,
-      miami_dade: `https://www.miamidade.gov/Apps/PA/propertysearch/#/`,
-      orange: `https://ocpafl.org/searches/parcelsearch.aspx`,
-      hillsborough: `https://gis.hcpafl.org/propertysearch/#/nav=addresses&q=${addr}`,
-      pinellas: `https://www.pcpao.gov/quick-search`,
-      palm_beach: `https://www.pbcgov.com/papa/Asps/PropertyDetail/PropertyDetail.aspx`,
-      duval: `https://paopropertysearch.coj.net/Basic/Detail.aspx`,
-      leon: `https://www.leonpa.org/property-search/`,
-      sarasota: `https://www.sc-pa.com/propertysearch/find`,
-      marion: `https://www.pa.marion.fl.us/Pages/PropertySearch.aspx`,
-      volusia: `https://vcpa.vcgov.org/search`,
-      polk: `https://www.polkpa.org/CamaDisplay.aspx?InputMode=0&Page=FindByAddress`,
-      pasco: `https://www.pascopa.com/Home/PropertySearch`,
-      seminole: `https://www.scpafl.org/Property-Search`,
-      lake: `https://www.lakecopropappr.com/property-search.html`,
-      collier: `https://www.collierappraiser.com/main_search/`,
-      lee: `https://www.leepa.org/Search/GenSearch.aspx`,
-      brevard: `https://www.bcpao.us/PropertySearch/`,
-      manatee: `https://www.manateepao.com/search/`,
-      charlotte: `https://www.ccappraiser.com/search.asp`,
-      stjohns: `https://www.sjcpa.us/`,
-      nassau: `https://www.nassauflpa.com/`,
-      clay: `https://www.ccpao.com/`,
-      flagler: `https://www.flaglerpa.com/`,
-      citrus: `https://www.citruspa.org/`,
-      hernando: `https://www.hernandopa.org/pa/`,
-      osceola: `https://www.property-appraiser.org/`,
-      suwannee: `https://www.suwanneepa.com/`,
-      levy: `https://www.levyclerk.com/property-appraiser`,
-      columbia: `https://columbiacountyfl.com/government/departments/property-appraiser`,
-      putnam: `https://www.putnam-fl.com/pa/`,
-      gilchrist: `https://www.gilchristpa.org/`,
-      lafayette: `https://lafayettecountyfl.com/property-appraiser/`,
-      union: `https://www.unioncountypa.org/`,
+      alachua:     'https://www.acpafl.org/search?locate=' + addr,
+      broward:     'https://bcpa.net/RecMenu.asp',
+      miamidade:   'https://www.miamidade.gov/Apps/PA/propertysearch/#/',
+      orange:      'https://ocpafl.org/searches/parcelsearch.aspx',
+      hillsborough:'https://gis.hcpafl.org/propertysearch/#/nav=addresses&q=' + addr,
+      pinellas:    'https://www.pcpao.gov/quick-search',
+      palmbeach:   'https://www.pbcgov.com/papa/Asps/PropertyDetail/PropertyDetail.aspx',
+      duval:       'https://paopropertysearch.coj.net/Basic/Detail.aspx',
+      leon:        'https://www.leonpa.org/property-search/',
+      sarasota:    'https://www.sc-pa.com/propertysearch/find',
+      marion:      'https://www.pa.marion.fl.us/Pages/PropertySearch.aspx',
+      volusia:     'https://vcpa.vcgov.org/search',
+      polk:        'https://www.polkpa.org/CamaDisplay.aspx?InputMode=0&Page=FindByAddress',
+      pasco:       'https://www.pascopa.com/Home/PropertySearch',
+      seminole:    'https://www.scpafl.org/Property-Search',
+      lake:        'https://www.lakecopropappr.com/property-search.html',
+      collier:     'https://www.collierappraiser.com/main_search/',
+      lee:         'https://www.leepa.org/Search/GenSearch.aspx',
+      brevard:     'https://www.bcpao.us/PropertySearch/',
+      manatee:     'https://www.manateepao.com/search/',
+      charlotte:   'https://www.ccappraiser.com/search.asp',
+      stjohns:     'https://www.sjcpa.us/',
+      nassau:      'https://www.nassauflpa.com/',
+      clay:        'https://www.ccpao.com/',
+      flagler:     'https://www.flaglerpa.com/',
+      citrus:      'https://www.citruspa.org/',
+      hernando:    'https://www.hernandopa.org/pa/',
+      osceola:     'https://www.property-appraiser.org/',
+      suwannee:    'https://www.suwanneepa.com/',
+      levy:        'https://www.levyclerk.com/property-appraiser',
+      columbia:    'https://columbiacountyfl.com/government/departments/property-appraiser',
+      putnam:      'https://www.putnam-fl.com/pa/',
+      gilchrist:   'https://www.gilchristpa.org/',
+      lafayette:   'https://lafayettecountyfl.com/property-appraiser/',
+      union:       'https://www.unioncountypa.org/',
     };
     // Use county-specific URL if we have it, then open separately for the search
     const baseUrl = countyGIS[county] || countyGIS[county.replace('saint','st').replace('st_','st')] || null;
