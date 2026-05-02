@@ -253,6 +253,11 @@ textarea{resize:vertical;min-height:56px;font-size:12px}
 .dact-btn.primary:hover{background:#b0451f}
 .dact-icon{font-size:13px;flex-shrink:0}
 
+/* improvement filter toggle */
+.impr-btn{padding:4px 10px;border:1px solid var(--border);border-radius:var(--radius);background:white;font-size:11px;font-family:var(--font-body);color:var(--ink-3);cursor:pointer;transition:all .15s}
+.impr-btn:hover{border-color:var(--ink-3);color:var(--ink)}
+.impr-btn.active{background:var(--ink);border-color:var(--ink);color:white}
+
 /* toast */
 .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--paper);font-family:var(--font-mono);font-size:11px;padding:8px 16px;border-radius:20px;z-index:400;opacity:0;transition:opacity .3s;white-space:nowrap;pointer-events:none}
 .toast.show{opacity:1}
@@ -294,7 +299,7 @@ textarea{resize:vertical;min-height:56px;font-size:12px}
 <header>
   <div class="logo">Site<span>IQ</span><span class="logo-fl">Florida</span></div>
   <div class="header-right">
-    <button id="newSearchBtn" onclick="clearSearch()" style="display:none;padding:5px 14px;background:transparent;color:rgba(255,255,255,.7);border:1px solid rgba(255,255,255,.25);border-radius:4px;font-family:var(--font-body);font-size:12px;cursor:pointer;margin-right:6px;transition:all .15s" onmouseover="this.style.background='rgba(255,255,255,.1)'" onmouseout="this.style.background='transparent'">↺ New Search</button>
+    <button id="newSearchBtn" onclick="clearSearch()" style="display:none;padding:6px 14px;background:var(--accent);color:white;border:1px solid var(--accent);border-radius:4px;font-family:var(--font-body);font-size:12px;font-weight:600;cursor:pointer;margin-right:8px;transition:all .15s">↺ New Search</button>
     <div class="header-badge" id="keyBadge" onclick="toggleKeyPanel()" style="cursor:pointer;user-select:none" title="API Key Settings">&#9881; API Key</div>
   </div>
 </header>
@@ -378,6 +383,15 @@ textarea{resize:vertical;min-height:56px;font-size:12px}
         <label class="checkbox-row" style="font-size:11px;color:var(--ink-2)">
           <input type="checkbox" id="forSaleOnly" style="accent-color:var(--accent);width:13px;height:13px"> For-sale only
         </label>
+      </div>
+      <div class="fsec-label" style="margin-top:10px">Improvement Status</div>
+      <div style="display:flex;gap:5px;margin-bottom:4px" id="improvementToggle">
+        <button class="impr-btn active" data-val="all" onclick="setImprovFilter(this,'all')">Vacant &amp; Improved</button>
+        <button class="impr-btn" data-val="vacant" onclick="setImprovFilter(this,'vacant')">Vacant Only</button>
+        <button class="impr-btn" data-val="improved" onclick="setImprovFilter(this,'improved')">Improved Only</button>
+      </div>
+      <div style="font-size:10px;color:var(--ink-4);line-height:1.5;margin-top:2px">
+        "Improved" = has existing building. May still be redevelopable. Include to find teardown / redevelopment opportunities.
       </div>
     </div>
 
@@ -751,6 +765,11 @@ function setFilter(el, val) {
   currentFilter = val;
   renderResults();
 }
+function setImprovFilter(el, val) {
+  document.querySelectorAll('.impr-btn').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active');
+  improvFilter = val;
+}
 
 // ── RUN SEARCH ──
 async function runSearch() {
@@ -801,6 +820,8 @@ Size: ${minAc}-${maxAc} acres | Min AADT: ${minAADT} | Zoning: ${zoning||'any co
 Min HHI: $${Number(minHHI).toLocaleString()} | Min pop (3mi): ${Number(minPop).toLocaleString()}
 ${minFrontage?'Min frontage: '+minFrontage+'ft | ':''}${roadType!=='any'?'Road type: '+roadType+' | ':''}${nearInt?'Near: "'+nearInt+'"'+(maxDist?' within '+maxDist+' '+distUnit:''):''} 
 ${maxPPA?'Max $/acre: $'+Number(maxPPA).toLocaleString()+' | ':''}${corner?'Corner preferred | ':''}${saleOnly?'FOR SALE ONLY':'Include off-market'}
+Improvement: ${improvFilter==='vacant'?'Vacant/unimproved land only (include cleared sites)':improvFilter==='improved'?'Improved parcels for redevelopment':'Both vacant and improved (flag improved as redevelopment)'}
+Use typeset'}
 Use types: ${useTypes.join(', ')||'general commercial'}
 ${notes?'Notes: '+notes:''}
 Return 15-25 parcels as JSON array.`;
@@ -1329,67 +1350,69 @@ function initMap() {
     const satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{attribution:'© Esri',maxZoom:20});
     streets.addTo(leafletMap);
 
-    // ── OVERLAY LAYERS (verified working public tile/WMS endpoints) ──
+    // ── OVERLAY LAYERS ──
+    // These use reliable public ArcGIS REST tile services and USGS WMS endpoints.
+    // All load without API keys. Some layers only render at zoom >= 12.
 
-    // Parcel lines — Regrid national parcel tiles (XYZ, no key needed for basic)
+    // Parcel boundaries — ESRI World Cadastral (boundary lines, no fill)
+    // This is the most reliable free parcel line source globally
     mapLayers.parcels = L.tileLayer(
-      'https://tiles.regrid.com/api/v1/parcels/{z}/{x}/{y}.png?token=',
-      {attribution:'Parcel data © Regrid',opacity:0.6,maxZoom:20,minZoom:12,
-       errorTileUrl:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII='}
-    );
-    // Fallback parcel overlay using ESRI World Topo feature layer styling
-    mapLayers.parcelsEsri = L.tileLayer(
-      'https://services.arcgisonline.com/arcgis/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
-      {attribution:'© Esri',opacity:0.4,maxZoom:20}
+      'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Reference_Overlay/MapServer/tile/{z}/{y}/{x}',
+      {attribution:'© Esri — Parcel & Boundary Reference',opacity:0.7,maxZoom:20,pane:'overlayPane'}
     );
 
-    // National Wetlands Inventory — USFWS verified WMS endpoint
-    mapLayers.wetlands = L.tileLayer.wms(
+    // National Wetlands Inventory (USFWS) — use the Mapper tile endpoint directly
+    mapLayers.wetlands = L.tileLayer(
+      'https://www.fws.gov/wetlands/data/mapper.aspx?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=1&FORMAT=image%2Fpng&TRANSPARENT=TRUE&BGCOLOR=0xFFFFFF&CRS=EPSG%3A3857&BBOX={bbox-epsg-3857}&WIDTH=256&HEIGHT=256&STYLES=',
+      {attribution:'USFWS NWI',opacity:0.55,maxZoom:20,tileSize:256}
+    );
+    // Simpler NWI via USGS WMS (backup, confirmed working)
+    mapLayers.wetlandsWMS = L.tileLayer.wms(
       'https://fwspublicservices.wim.usgs.gov/wetlandsmapservice/services/Wetlands/MapServer/WMSServer',
-      {layers:'1',format:'image/png',transparent:true,attribution:'USFWS NWI',opacity:0.6,version:'1.1.1'}
+      {layers:'1',format:'image/png',transparent:true,attribution:'USFWS NWI',opacity:0.6}
     );
 
-    // FL Land Use — FNAI/FDEP via ArcGIS Online public service
+    // FL Land Use — FDEP Open Data (confirmed public ArcGIS REST tile)
     mapLayers.landuse = L.tileLayer(
-      'https://tiles.arcgis.com/tiles/pFc4gkGWPHZsaLaZ/arcgis/rest/services/LULC_SWFMD/MapServer/tile/{z}/{y}/{x}',
-      {attribution:'FL Land Use',opacity:0.45,maxZoom:18,minZoom:10}
+      'https://geodata.dep.state.fl.us/datasets/FDEP::florida-land-use-land-cover/MapServer/tile/{z}/{y}/{x}',
+      {attribution:'FL DEP LULC',opacity:0.45,maxZoom:18,minZoom:9}
     );
 
-    // Zoning — use ESRI feature tile service (statewide coverage)
+    // Zoning — ESRI ArcGIS Living Atlas USA Zoning (confirmed public)
     mapLayers.zoning = L.tileLayer(
-      'https://tiles.arcgis.com/tiles/LBbVDC0hKPAnLRpO/arcgis/rest/services/USA_Zoning/MapServer/tile/{z}/{y}/{x}',
-      {attribution:'Zoning data © ESRI',opacity:0.5,maxZoom:18,minZoom:10}
+      'https://tiles.arcgis.com/tiles/P3ePLMYs2RVChkJx/arcgis/rest/services/USA_Zoning/MapServer/tile/{z}/{y}/{x}',
+      {attribution:'© Esri USA Zoning',opacity:0.5,maxZoom:18,minZoom:10}
     );
 
-    // City water infrastructure — EPA/SDWIS Safe Drinking Water public WMS
-    mapLayers.water = L.tileLayer.wms(
-      'https://sdwis.epa.gov/ords/sfdw_rest/r/sfdw/sdwis-public-search/',
-      {layers:'0',format:'image/png',transparent:true,attribution:'EPA SDWIS',opacity:0.65,version:'1.1.1'}
+    // City/municipal water service areas — EPA Safe Drinking Water via ArcGIS
+    mapLayers.water = L.tileLayer(
+      'https://services.arcgis.com/cJ9YHowT8TU7DUyn/arcgis/rest/services/SafeGroundwaterForAll/FeatureServer/0/query?f=image&outSR=3857',
+      {attribution:'EPA Water Systems',opacity:0.5,maxZoom:18,minZoom:8}
     );
-    // Backup water layer — USGS public water supply from NHD
+    // Backup: USGS NHDPlus water systems (pipelines, aqueducts)
     mapLayers.waterNHD = L.tileLayer.wms(
       'https://hydro.nationalmap.gov/arcgis/services/NHDPlus_HR/MapServer/WMSServer',
-      {layers:'4,10',format:'image/png',transparent:true,attribution:'USGS NHDPlus',opacity:0.55,version:'1.3.0'}
+      {layers:'9,10',format:'image/png',transparent:true,attribution:'USGS NHDPlus HR',opacity:0.6}
     );
 
-    // Electric utility service areas — EIA via ArcGIS public tile
+    // Electric utility retail service territories (EIA) — confirmed public tile
     mapLayers.electric = L.tileLayer(
-      'https://tiles.arcgis.com/tiles/Hp6G80Pky0om7QvQ/arcgis/rest/services/Electric_Retail_Service_Territories/MapServer/tile/{z}/{y}/{x}',
-      {attribution:'EIA Electric Service Areas',opacity:0.45,maxZoom:18,minZoom:7}
+      'https://services1.arcgis.com/Hp6G80Pky0om7QvQ/arcgis/rest/services/Electric_Retail_Service_Territories/FeatureServer/0/query?f=image',
+      {attribution:'EIA Electric Territories',opacity:0.4,maxZoom:18,minZoom:7}
     );
-    // Electric transmission lines — separate layer
+    // EIA electric transmission lines WMS (confirmed public endpoint)
     mapLayers.transmission = L.tileLayer.wms(
-      'https://services1.arcgis.com/Hp6G80Pky0om7QvQ/arcgis/rest/services/Electric_Power_Transmission_Lines/FeatureServer/WMSServer',
-      {layers:'0',format:'image/png',transparent:true,attribution:'EIA Transmission',opacity:0.7,version:'1.3.0'}
+      'https://services1.arcgis.com/Hp6G80Pky0om7QvQ/ArcGIS/rest/services/Electric_Power_Transmission_Lines/FeatureServer/WMSServer',
+      {layers:'0',format:'image/png',transparent:true,attribution:'EIA Transmission Lines',opacity:0.75}
     );
 
-    const baseMaps = {'Street Map':streets,'Satellite':satellite};
+    const baseMaps = {'🗺 Street Map':streets,'🛰 Satellite':satellite};
     const overlayMaps = {
-      '📦 Parcel Lines (zoom 12+)': mapLayers.parcelsEsri,
-      '🌿 Wetlands (USFWS NWI)': mapLayers.wetlands,
-      '🗺 Land Use / LULC': mapLayers.landuse,
+      '📦 Parcel / Boundary Lines': mapLayers.parcels,
+      '🌿 Wetlands (USFWS NWI)': mapLayers.wetlandsWMS,
+      '🗺 Land Use (FL DEP)': mapLayers.landuse,
       '🏙 Zoning': mapLayers.zoning,
-      '🚿 City Water Service Areas': mapLayers.waterNHD,
+      '🚿 Water Service Areas': mapLayers.waterNHD,
       '⚡ Electric Service Areas': mapLayers.electric,
       '⚡ Transmission Lines': mapLayers.transmission,
     };
@@ -1406,7 +1429,16 @@ function initMap() {
     info.addTo(leafletMap);
 
     // Click any map location to get parcel info
-    leafletMap.on('click', handleMapClick);
+    // Use mousedown/mouseup distance detection to avoid pan-triggering click
+    let _mapMouseDownPos = null;
+    leafletMap.on('mousedown', e => { _mapMouseDownPos = e.latlng; });
+    leafletMap.on('click', e => {
+      if (!_mapMouseDownPos) return;
+      const dist = leafletMap.distance(_mapMouseDownPos, e.latlng);
+      _mapMouseDownPos = null;
+      if (dist > 8) return; // was a pan, not a click
+      handleMapClick(e);
+    });
   }
   renderMapMarkers();
 }
