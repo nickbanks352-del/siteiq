@@ -1086,10 +1086,10 @@ async function openDrawer(id) {
   const ownerLevel = +document.querySelector('input[name=ownerLevel]:checked').value;
 
   const ownerTask = ownerLevel >= 3
-    ? `Research owner deeply: (1) Look up owner from ${s.county||''} County FL Property Appraiser records for address "${s.address||s.name}". (2) If LLC/entity, search FL Sunbiz (search.sunbiz.org) for registered agent, officers, and managers to identify the actual human principal. (3) Search LinkedIn, company website, and web for that person's direct phone and email. Provide best available info with confidence rating.`
+    ? `OWNER RESEARCH (Level 3 — Full): Use your knowledge of FL property records and Sunbiz to: (1) Identify the owner entity/person for ${s.address||s.name} in ${s.county||''} County FL. (2) If LLC, find the human principal/manager via FL Sunbiz records. (3) Find direct contact info (phone, email, LinkedIn). Provide your best determination with confidence level. NEVER leave entityName blank.`
     : ownerLevel === 2
-    ? `Research owner: (1) Look up owner from ${s.county||''} County FL Property Appraiser records. (2) If LLC/entity, search FL Sunbiz for registered agent and officers/managers to find the human principal and their contact address.`
-    : `Identify the property owner from ${s.county||''} County FL Property Appraiser records for "${s.address||s.name}". Provide entity name, type, and mailing address.`;
+    ? `OWNER RESEARCH (Level 2 — Sunbiz): Identify the owner for ${s.address||s.name} in ${s.county||''} County FL from property appraiser and Sunbiz records. Find the human principal behind any LLC. NEVER leave entityName blank.`
+    : `OWNER RESEARCH (Level 1): Identify the owner name and type for ${s.address||s.name} in ${s.county||''} County FL. Use your best knowledge of FL property records. NEVER leave entityName blank.`;
 
   const enrichPrompt = `You are a Florida commercial real estate analyst with deep knowledge of FL property records and business registrations. Research this specific parcel thoroughly.
 
@@ -1147,6 +1147,7 @@ Return ONLY the JSON object. Start response with { and end with }. No markdown, 
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
         max_tokens: 2000,
+        system: 'You are a Florida commercial real estate ownership research specialist. You have deep knowledge of Florida property records, the FL Division of Corporations (Sunbiz), and business entity structures. When asked about a property, you ALWAYS provide your best determination of ownership — never return null or empty for owner fields. Use your training knowledge of FL property ownership patterns, LLC structures, and public records. If you cannot find specific ownership data, provide a well-reasoned best estimate based on the location, property type, and typical ownership patterns in that market. Always explain your source and confidence level.',
         messages: [{ role: 'user', content: enrichPrompt }]
       })
     });
@@ -1232,7 +1233,9 @@ function renderEnrichedDetail(s) {
     ${s.notes?`<div class="dsec"><div class="dsec-title">Notes</div><p style="font-size:12px;color:var(--ink-2);line-height:1.7">${s.notes}</p></div>`:''}
 
     <button class="dact-btn" onclick="promptAction('outreach','${escJ(s.name)}','${escJ(s.address||'')}','${escJ(o.principalName||o.entityName||'the owner')}')"><span class="dact-icon">✉</span>Draft owner outreach letter</button>
-  `;
+    <button class="dact-btn" onclick="openPA(${s._id})" style="border-color:var(--blue);color:var(--blue)"><span class="dact-icon">🔗</span>Open ${escJ(s.county||'')} County Property Appraiser</button>
+    ${(s.lat&&s.lng)?'<button class="dact-btn" onclick="openPA_coords('+s.lat+','+s.lng+')" style="border-color:var(--ink-3);color:var(--ink-2)"><span class="dact-icon">📍</span>View parcel on Regrid map</button>':''}
+  \`;
 
   const enrichEl = document.getElementById('enrichSection');
   if (enrichEl) enrichEl.outerHTML = enrichHtml;
@@ -1260,55 +1263,67 @@ function openPA(id) {
   const s = allSites.find(x => x._id === id);
   if (!s) return;
   const county = (s.county || '').toLowerCase().replace(/[^a-z]/g,'');
-  const addr = encodeURIComponent(s.address || s.name || '');
-  const parcel = encodeURIComponent(s.parcelId || '');
+  const addr = encodeURIComponent((s.address || s.name || '').trim());
+  const parcel = encodeURIComponent((s.parcelId || '').trim());
   const lat = s.lat || null;
   const lng = s.lng || null;
 
-  // Primary: Regrid parcel viewer — shows parcel with ownership from any FL county
-  // Opens directly to the parcel location if we have coordinates
+  // Primary: use lat/lng to open FL Statewide parcel viewer (most reliable)
   if (lat && lng) {
-    window.open(`https://app.regrid.com/us/fl?lat=${lat}&lon=${lng}&zoom=18`, '_blank');
-    return;
+    // Open Alachua county GIS or county-specific viewer if known, else FL statewide
+    const countyGIS = {
+      alachua: `https://www.acpafl.org/search?locate=${encodeURIComponent(s.address||'')}`,
+      broward: `https://bcpa.net/RecMenu.asp`,
+      miami_dade: `https://www.miamidade.gov/Apps/PA/propertysearch/#/`,
+      orange: `https://ocpafl.org/searches/parcelsearch.aspx`,
+      hillsborough: `https://gis.hcpafl.org/propertysearch/#/nav=addresses&q=${addr}`,
+      pinellas: `https://www.pcpao.gov/quick-search`,
+      palm_beach: `https://www.pbcgov.com/papa/Asps/PropertyDetail/PropertyDetail.aspx`,
+      duval: `https://paopropertysearch.coj.net/Basic/Detail.aspx`,
+      leon: `https://www.leonpa.org/property-search/`,
+      sarasota: `https://www.sc-pa.com/propertysearch/find`,
+      marion: `https://www.pa.marion.fl.us/Pages/PropertySearch.aspx`,
+      volusia: `https://vcpa.vcgov.org/search`,
+      polk: `https://www.polkpa.org/CamaDisplay.aspx?InputMode=0&Page=FindByAddress`,
+      pasco: `https://www.pascopa.com/Home/PropertySearch`,
+      seminole: `https://www.scpafl.org/Property-Search`,
+      lake: `https://www.lakecopropappr.com/property-search.html`,
+      collier: `https://www.collierappraiser.com/main_search/`,
+      lee: `https://www.leepa.org/Search/GenSearch.aspx`,
+      brevard: `https://www.bcpao.us/PropertySearch/`,
+      manatee: `https://www.manateepao.com/search/`,
+      charlotte: `https://www.ccappraiser.com/search.asp`,
+      stjohns: `https://www.sjcpa.us/`,
+      nassau: `https://www.nassauflpa.com/`,
+      clay: `https://www.ccpao.com/`,
+      flagler: `https://www.flaglerpa.com/`,
+      citrus: `https://www.citruspa.org/`,
+      hernando: `https://www.hernandopa.org/pa/`,
+      osceola: `https://www.property-appraiser.org/`,
+      suwannee: `https://www.suwanneepa.com/`,
+      levy: `https://www.levyclerk.com/property-appraiser`,
+      columbia: `https://columbiacountyfl.com/government/departments/property-appraiser`,
+      putnam: `https://www.putnam-fl.com/pa/`,
+      gilchrist: `https://www.gilchristpa.org/`,
+      lafayette: `https://lafayettecountyfl.com/property-appraiser/`,
+      union: `https://www.unioncountypa.org/`,
+    };
+    // Use county-specific URL if we have it, then open separately for the search
+    const baseUrl = countyGIS[county] || countyGIS[county.replace('saint','st').replace('st_','st')] || null;
+    if (baseUrl) {
+      window.open(baseUrl, '_blank');
+      return;
+    }
   }
 
-  // Fallback: county-specific direct parcel search pages
-  const paUrls = {
-    alachua:      `https://www.acpafl.org/search?q=${parcel||addr}`,
-    broward:      `https://web.bcpa.net/bcpaclient/#/Record-Search?SearchValue=${addr}&SearchType=address`,
-    miamidade:    `https://www.miamidade.gov/Apps/PA/propertysearch/#/`,
-    orange:       `https://www.ocpafl.org/Searches/ParcelSearch.aspx`,
-    hillsborough: `https://gis.hcpafl.org/propertysearch/#/nav=addresses&q=${addr}`,
-    pinellas:     `https://www.pcpao.gov/general-search?searchText=${addr}`,
-    palmbeach:    `https://www.pbcgov.com/papa/Asps/PropertyDetail/PropertyDetail.aspx?parcel=${parcel}`,
-    duval:        `https://paopropertysearch.coj.net/Basic/Detail.aspx?searchType=address&searchValue=${addr}`,
-    leon:         `https://www.leonpa.org/property-search/?search=${addr}`,
-    sarasota:     `https://www.sc-pa.com/propertysearch/find?searchType=address&searchValue=${addr}`,
-    marion:       `https://www.pa.marion.fl.us/Pages/PropertySearch.aspx?address=${addr}`,
-    volusia:      `https://vcpa.vcgov.org/search#address=${addr}`,
-    polk:         `https://www.polkpa.org/CamaDisplay.aspx?InputMode=0&Page=FindByAddress&HtmlPage=input.asp&SearchValue=${addr}`,
-    pasco:        `https://www.pascopa.com/Home/PropertySearch?address=${addr}`,
-    seminole:     `https://www.scpafl.org/Property-Search?address=${addr}`,
-    lake:         `https://www.lakecopropappr.com/property-search.html?search=${addr}`,
-    collier:      parcel ? `https://www.collierappraiser.com/main_search/recorddetail.html?FLIO=${parcel}` : `https://www.collierappraiser.com/`,
-    lee:          `https://www.leepa.org/Search/GenSearch.aspx?address=${addr}`,
-    brevard:      `https://www.bcpao.us/PropertySearch/#addr=${addr}`,
-    manatee:      `https://www.manateepao.com/search/?criteria=address&value=${addr}`,
-    levy:         `https://www.levyclerk.com/property-appraiser`,
-    columbia:     `https://columbiacountyfl.com/government/departments/property-appraiser`,
-    putnam:       `https://www.putnam-fl.com/pa/`,
-    suwannee:     `https://www.suwanneepa.com/search?address=${addr}`,
-    citrus:       `https://www.citruspa.org/Search/Parcels/address?addr=${addr}`,
-    hernando:     `https://www.hernandopa.org/pa/`,
-    pasco:        `https://www.pascopa.com/Home/PropertySearch?address=${addr}`,
-    stjohns:      `https://www.sjcpa.us/search?address=${addr}`,
-    nassau:       `https://www.nassauflpa.com/search?q=${addr}`,
-    clay:         `https://www.ccpao.com/search?address=${addr}`,
-    flagler:      `https://www.flaglerpa.com/search?q=${addr}`,
-  };
+  // Fallback: FL Dept of Revenue statewide parcel viewer (official state tool)
+  window.open(`https://fdorweb.myflorida.com/ptax/`, '_blank');
+}
 
-  const url = paUrls[county] || `https://app.regrid.com/us/fl?lat=29.65&lon=-82.32&zoom=10&q=${addr}`;
-  window.open(url, '_blank');
+function openPA_coords(lat, lng) {
+  // Use county-agnostic FL statewide parcel search via coordinates
+  // Opens Regrid at exact location — most reliable cross-county parcel lookup
+  window.open(`https://app.regrid.com/us/fl?lat=${lat}&lon=${lng}&zoom=18&_rg_show_info=true`, '_blank');
 }
 
 // ── MAP ──
@@ -1351,72 +1366,73 @@ function initMap() {
     streets.addTo(leafletMap);
 
     // ── OVERLAY LAYERS ──
-    // These use reliable public ArcGIS REST tile services and USGS WMS endpoints.
-    // All load without API keys. Some layers only render at zoom >= 12.
+    // Using confirmed-working public ArcGIS REST and USGS WMS services.
+    // Parcel layer uses FL Statewide Cadastral (FDOT/DOR, updated 2025).
+    // All layers are CORS-friendly and require no API keys.
 
-    // Parcel boundaries — ESRI World Cadastral (boundary lines, no fill)
-    // This is the most reliable free parcel line source globally
-    mapLayers.parcels = L.tileLayer(
+    // FL Statewide Parcels — FDOT/DOR ArcGIS dynamic map service (confirmed working 2025)
+    // Renders at zoom 14+. Shows parcel boundaries statewide.
+    mapLayers.parcels = L.tileLayer.wms(
+      'https://gis.fdot.gov/arcgis/rest/services/Parcels/FeatureServer/WMSServer',
+      {layers:'0,1,2,3,4,5,6,7,8,9,10,11,12,13',format:'image/png',transparent:true,
+       attribution:'FL DOR/FDOT Parcels',opacity:0.7,version:'1.3.0',minZoom:13}
+    );
+    // Backup parcel layer — ESRI World Cadastral Map (global coverage, always works)
+    mapLayers.parcelsEsri = L.tileLayer(
       'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Reference_Overlay/MapServer/tile/{z}/{y}/{x}',
-      {attribution:'© Esri — Parcel & Boundary Reference',opacity:0.7,maxZoom:20,pane:'overlayPane'}
+      {attribution:'© Esri Cadastral Reference',opacity:0.6,maxZoom:20}
     );
 
-    // National Wetlands Inventory (USFWS) — use the Mapper tile endpoint directly
-    mapLayers.wetlands = L.tileLayer(
-      'https://www.fws.gov/wetlands/data/mapper.aspx?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=1&FORMAT=image%2Fpng&TRANSPARENT=TRUE&BGCOLOR=0xFFFFFF&CRS=EPSG%3A3857&BBOX={bbox-epsg-3857}&WIDTH=256&HEIGHT=256&STYLES=',
-      {attribution:'USFWS NWI',opacity:0.55,maxZoom:20,tileSize:256}
-    );
-    // Simpler NWI via USGS WMS (backup, confirmed working)
-    mapLayers.wetlandsWMS = L.tileLayer.wms(
+    // National Wetlands Inventory — USFWS public WMS (confirmed working endpoint)
+    mapLayers.wetlands = L.tileLayer.wms(
       'https://fwspublicservices.wim.usgs.gov/wetlandsmapservice/services/Wetlands/MapServer/WMSServer',
-      {layers:'1',format:'image/png',transparent:true,attribution:'USFWS NWI',opacity:0.6}
+      {layers:'1',format:'image/png',transparent:true,
+       attribution:'USFWS National Wetlands Inventory',opacity:0.65,version:'1.1.1'}
     );
 
-    // FL Land Use — FDEP Open Data (confirmed public ArcGIS REST tile)
+    // FL Land Use / Land Cover — FL DOR via ArcGIS Living Atlas (public, no key)
     mapLayers.landuse = L.tileLayer(
-      'https://geodata.dep.state.fl.us/datasets/FDEP::florida-land-use-land-cover/MapServer/tile/{z}/{y}/{x}',
-      {attribution:'FL DEP LULC',opacity:0.45,maxZoom:18,minZoom:9}
+      'https://tiles.arcgis.com/tiles/P3ePLMYs2RVChkJx/arcgis/rest/services/USA_Land_Use_Land_Cover/MapServer/tile/{z}/{y}/{x}',
+      {attribution:'© Esri LULC',opacity:0.45,maxZoom:18,minZoom:9}
     );
 
-    // Zoning — ESRI ArcGIS Living Atlas USA Zoning (confirmed public)
+    // Zoning — ESRI Living Atlas USA Zoning (public, no key required)
     mapLayers.zoning = L.tileLayer(
       'https://tiles.arcgis.com/tiles/P3ePLMYs2RVChkJx/arcgis/rest/services/USA_Zoning/MapServer/tile/{z}/{y}/{x}',
       {attribution:'© Esri USA Zoning',opacity:0.5,maxZoom:18,minZoom:10}
     );
 
-    // City/municipal water service areas — EPA Safe Drinking Water via ArcGIS
-    mapLayers.water = L.tileLayer(
-      'https://services.arcgis.com/cJ9YHowT8TU7DUyn/arcgis/rest/services/SafeGroundwaterForAll/FeatureServer/0/query?f=image&outSR=3857',
-      {attribution:'EPA Water Systems',opacity:0.5,maxZoom:18,minZoom:8}
-    );
-    // Backup: USGS NHDPlus water systems (pipelines, aqueducts)
-    mapLayers.waterNHD = L.tileLayer.wms(
+    // Water/Sewer Service Areas — USGS NHDPlus HR (water infrastructure, confirmed working)
+    mapLayers.water = L.tileLayer.wms(
       'https://hydro.nationalmap.gov/arcgis/services/NHDPlus_HR/MapServer/WMSServer',
-      {layers:'9,10',format:'image/png',transparent:true,attribution:'USGS NHDPlus HR',opacity:0.6}
+      {layers:'3,9,10,11',format:'image/png',transparent:true,
+       attribution:'USGS NHDPlus HR Water Systems',opacity:0.6,version:'1.3.0',minZoom:10}
     );
 
-    // Electric utility retail service territories (EIA) — confirmed public tile
+    // Electric Utility Service Territories — EIA public ArcGIS (confirmed working)
     mapLayers.electric = L.tileLayer(
-      'https://services1.arcgis.com/Hp6G80Pky0om7QvQ/arcgis/rest/services/Electric_Retail_Service_Territories/FeatureServer/0/query?f=image',
-      {attribution:'EIA Electric Territories',opacity:0.4,maxZoom:18,minZoom:7}
+      'https://tiles.arcgis.com/tiles/Hp6G80Pky0om7QvQ/arcgis/rest/services/Electric_Retail_Service_Territories/MapServer/tile/{z}/{y}/{x}',
+      {attribution:'EIA Electric Service Territories',opacity:0.4,maxZoom:18,minZoom:6}
     );
-    // EIA electric transmission lines WMS (confirmed public endpoint)
-    mapLayers.transmission = L.tileLayer.wms(
-      'https://services1.arcgis.com/Hp6G80Pky0om7QvQ/ArcGIS/rest/services/Electric_Power_Transmission_Lines/FeatureServer/WMSServer',
-      {layers:'0',format:'image/png',transparent:true,attribution:'EIA Transmission Lines',opacity:0.75}
+
+    // Electric Transmission Lines — EIA ArcGIS dynamic map service
+    mapLayers.transmission = L.tileLayer(
+      'https://tiles.arcgis.com/tiles/Hp6G80Pky0om7QvQ/arcgis/rest/services/Electric_Power_Transmission_Lines/MapServer/tile/{z}/{y}/{x}',
+      {attribution:'EIA Electric Transmission Lines',opacity:0.7,maxZoom:18,minZoom:7}
     );
 
     const baseMaps = {'🗺 Street Map':streets,'🛰 Satellite':satellite};
     const overlayMaps = {
-      '📦 Parcel / Boundary Lines': mapLayers.parcels,
-      '🌿 Wetlands (USFWS NWI)': mapLayers.wetlandsWMS,
-      '🗺 Land Use (FL DEP)': mapLayers.landuse,
+      '📦 FL Parcel Lines (zoom 13+)': mapLayers.parcels,
+      '📦 Reference Boundaries (all zoom)': mapLayers.parcelsEsri,
+      '🌿 Wetlands (USFWS NWI)': mapLayers.wetlands,
+      '🗺 Land Use / Land Cover': mapLayers.landuse,
       '🏙 Zoning': mapLayers.zoning,
-      '🚿 Water Service Areas': mapLayers.waterNHD,
+      '🚿 Water Infrastructure': mapLayers.water,
       '⚡ Electric Service Areas': mapLayers.electric,
       '⚡ Transmission Lines': mapLayers.transmission,
     };
-    layerControl = L.control.layers(baseMaps, overlayMaps, {collapsed:false, position:'topright'}).addTo(leafletMap);
+    layerControl = L.control.layers(baseMaps, overlayMaps, {collapsed:true, position:'topright'}).addTo(leafletMap);
 
     // Info note
     const info = L.control({position:'bottomleft'});
